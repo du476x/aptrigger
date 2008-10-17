@@ -1,5 +1,4 @@
 #!/bin/sh 
-# vim: set ts=3 sw=3 sts=3 et si ai: 
 # 
 # aptrigger.sh -- Monitor de Operacion y Servicios 
 # ___________________________________________________________________
@@ -1208,3 +1207,4 @@ else
    exit ${LASTSTATUS}
 fi
 
+# vim: set ts=3 sw=3 sts=3 et si ai: 
