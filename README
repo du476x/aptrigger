@@ -1,0 +1,63 @@
+aptrigger
+--
+
+Options:
+
+	$ aptrigger --service=test --start
+	starting test application ...																		[OK]
+	
+	
+	$ aptrigger --service=test --stop
+	 - routine ( savving logs application )														[*]
+	 - routine ( commpressing logs information )													[*]
+	stopping test application ...																		[OK]
+	
+	
+	$ aptrigger --service=test --restart
+	 - routine ( savving logs application )														[*]
+	 - routine ( commpressing logs information )													[*]
+	stopping test application ...																		[OK]
+	starting test application ...																		[OK]
+	
+	
+	$ aptrigger --service=test --stop --forced
+	forcing stop application !
+	 - routine ( kernel full thread dump )															[*]
+	 - routine ( kernel full thread dump )															[*]
+	 - routine ( kernel full thread dump )															[*]
+	 - routine ( savving logs application )														[*]
+	stopping test application ...																		[OK]
+	
+	
+	$ aptrigger --service --maintenance
+	 - routine ( grouping file logs )																[*]
+	 - routine ( delete file logs with 8 days old )												[*]
+	 maintenance test application ...																[OK]
+	
+	
+	$ aptrigger --service=test --status
+	test is running !
+	 - PID: 2345, 4567			( processes )
+	 - MEM: 24567					( memory )
+	 - FSS: /dev/sdb1/vol1		( filesystem )
+	 - FSZ: 10240,5600,4567		( total, occuped, available )
+	
+	
+	$ aptrigger --report
+	
+	
+	HOST on IP
+	service		| processes		|		
+	------------+--------------+-------------------
+	
+
+	$ aptrigger --report --sendto
+	sending report by mail																				[OK]
+
+	$ aptrigger --version
+	aptrigger v3.0unstable
+	
+	put your records on -- Corinne Bailey Rae
+	written by Andres Aquino <andres.aquino@gmail.com>
+
+
