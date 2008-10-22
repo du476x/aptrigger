@@ -5,7 +5,6 @@
 # (c) 2008 aQzero
 #
 # aQzero <aqzero@gmail.com>
-# $Id$
 
 # [ ABSTRACT ]
 # Iniciar y detener los servicios que administra Control-M, aparentemente solo 
