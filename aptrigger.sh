@@ -2,9 +2,9 @@
 # 
 # aptrigger.sh -- Monitor de Operacion y Servicios 
 # ___________________________________________________________________
-# (c) 2008 Andrés Aquino
+# (c) 2008 aQzero
 #
-# Andrés Aquino <andres.aquino@gmail.com>
+# aQzero <aqzero@gmail.com>
 # $Id$
 
 # [ ABSTRACT ]
@@ -245,7 +245,7 @@ check_weblogicserver() {
 #
 # realizar un kernel full thread dump sobre el proceso indicado.
 # sobre procesos non-java va a valer queso, por que la señal 3 es para hacer un vaciado de memoria.
-# aptrigger --application=resin --threaddump=5 --mailto=cesar.aquino@nextel.com.mx
+# aptrigger --application=resin --threaddump=5 --mailto=aqzero@gmail.com
 # por defecto, el ftd se almacena en el filesystem log de la aplicación; si se detecta que se esta
 # incrementando el uso del filesystem, conserva los mas recientes 
 make_fullthreaddump() {
@@ -362,13 +362,13 @@ show_version () {
    LWVERSION=`echo ${VERSIONAPP} | sed -e "s/^.//g"`
    LASTSONG="Incognito - Enigma"
    echo "${NAMEAPP} v${UPVERSION}.${LWVERSION}"
-   echo "Copyright (C) 2008 Nextel de Mexico\n"
+   echo "Copyright (C) 2008\n"
 
    # como a mi jefe le caga que en los logs anexe mi correo, pues se lo quitamos 
    if ${SVERSION}
    then
       echo "${LASTSONG}"
-      echo "Written by Andres Aquino <andres.aquino@gmail.com>\n"
+      echo "Written by aQzero <aqzero@gmail.com>\n"
    fi
 
 }
@@ -621,7 +621,7 @@ do
             echo "   ... [ -[-q]uiet ]                        don't send output to terminal"
             echo "   [--version|-V]                           give app version"
             echo "   -[-]help                                 give this help\n"
-            echo "Report bugs to <cesar.aquino@nextel.com.mx>"
+            echo "Report bugs to <aqzero@gmail.com>"
          fi
          exit 0
          ;;
