@@ -1,64 +1,37 @@
-aptrigger
---
-
-Options:
-
-	$ aptrigger --service=test --start
-	starting test application ...																		[OK]
-	
-	
-	$ aptrigger --service=test --stop
-	 - routine ( savving logs application )														[*]
-	 - routine ( commpressing logs information )													[*]
-	stopping test application ...																		[OK]
-	
-	
-	$ aptrigger --service=test --restart
-	 - routine ( savving logs application )														[*]
-	 - routine ( commpressing logs information )													[*]
-	stopping test application ...																		[OK]
-	starting test application ...																		[OK]
-	
-	
-	$ aptrigger --service=test --stop --forced
-	forcing stop application !
-	 - routine ( kernel full thread dump )															[*]
-	 - routine ( kernel full thread dump )															[*]
-	 - routine ( kernel full thread dump )															[*]
-	 - routine ( savving logs application )														[*]
-	stopping test application ...																		[OK]
-	
-	
-	$ aptrigger --service --maintenance
-	 - routine ( grouping file logs )																[*]
-	 - routine ( delete file logs with 8 days old )												[*]
-	 maintenance test application ...																[OK]
-	
-	
-	$ aptrigger --service=test --status
-	test is running !
-	 - PID: 2345, 4567			( processes )
-	 - MEM: 24567					( memory )
-	 - FSS: /dev/sdb1/vol1		( filesystem )
-	 - FSZ: 10240,5600,4567		( total, occuped, available )
-	
-	
-	$ aptrigger --report
-	
-	
-	HOST on IP
-	service		| processes		|		
-	------------+--------------+-------------------
-	
-
-	$ aptrigger --report --sendto
-	sending report by mail																				[OK]
-
-	$ aptrigger --version
-	aptrigger v3.0unstable
-	
-	put your records on -- Corinne Bailey Rae
-	written by Andrés Aquino Morales <andres.aquino@gmail.com>
+            _____    _                   
+   __ _ _ _|_   _| _(_)__ _ __ _ ___ _ _ 
+  / _` | '_ \| || '_| / _` / _` / -_) '_|
+  \__,_| .__/|_||_| |_\__, \__, \___|_|  
+       |_|            |___/|___/         
+=-=
+Aplicacion para iniciar y detener aplicaciones like init.d
 
 
+Hasta el momento lo he probado con:
+	* WebLogic 10
+	* WebLogic 9.2
+	* WebLogic 8.1
+	* WebLogic 6
+   * Targys (install screen)
+   * otras aplicaciones
 
+
+TODO
+	* Ejecutar los procesos de iniciar y detener por aplicación, en base a su
+		archivo de configuración
+	* Verificar que el proceso realmente sea dado de baja verificando los PID's
+		de cada aplicación
+	* Generar los archivos de PID's por proceso, de log, de error y de bloqueo
+		para cada proceso de ejecución
+	* Generar archivo de respaldo de los archivos de datos generados por la app
+	* Verificar que sea el usuario asignado en el archivo de configuración quien
+		realmente ejecute el proceso
+	* Verificar los tamaños asignados en HD antes de ejecutar la aplicación
+		para no quedarse sin espacio para la ejecución del proceso
+
+
+De momento lo pidieron en SH, pero es posible crecerlo a PERL ya que HP/UX
+trae por defecto un PERL 5.0.0; solo es cuestión de checar los modulos con
+los que cuenta para poder "jugarle"
+
+# vim: set ts=3 et sw=3 sts=3 si ai:

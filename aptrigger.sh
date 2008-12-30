@@ -1,11 +1,13 @@
 #!/bin/sh 
+# vim: set ts=3 sw=3 sts=3 et si ai: 
 # 
 # aptrigger.sh -- Monitor de Operacion y Servicios 
 # ___________________________________________________________________
 # (c) 2008 MashedCode Co.
-# 
-# Andrés Aquino Morales <andres.aquino@gmail.com>
-
+#
+# Andrés Aquino <andres.aquino@gmail.com>
+# $Id$
+#
 
 # [ ABSTRACT ]
 # Iniciar y detener los servicios que administra Control-M, aparentemente solo 
@@ -80,7 +82,7 @@ log_backup () {
    # por que HP/UX tiene que ser taaan soso = estupido ? ? 
    # backup de log | err | pid para análisis
    # tar archivos | gzip -c > file-log
-   $aptar cvf "${LOG}_${DAYOF}.tar" "${DAYOF}" > /dev/null 2>&1
+   $aptar -cvf "${LOG}_${DAYOF}.tar" "${DAYOF}" > /dev/null 2>&1
    $apzip -c "${LOG}_${DAYOF}.tar" > "${LOG}_${DAYOF}.tar.gz"
    LOGSIZE=`du -sk ${LOG}_${DAYOF}.tar.gz | cut -f1`
    log_action "INFO" "Creating ${LOG}_${DAYOF}.tar.gz file with ${LOGSIZE}M of size"
@@ -362,13 +364,13 @@ show_version () {
    LWVERSION=`echo ${VERSIONAPP} | sed -e "s/^.//g"`
    LASTSONG="Incognito - Enigma"
    echo "${NAMEAPP} v${UPVERSION}.${LWVERSION}"
-   echo "Copyright (C) 2008\n"
+   echo "Copyright (C) 2008 MashedCode Co.\n"
 
    # como a mi jefe le caga que en los logs anexe mi correo, pues se lo quitamos 
    if ${SVERSION}
    then
       echo "${LASTSONG}"
-      echo "Written by Andrés Aquino Morales <andres.aquino@gmail.com>\n"
+      echo "Written by Andres Aquino <andres.aquino@gmail.com>\n"
    fi
 
 }
@@ -1207,4 +1209,3 @@ else
    exit ${LASTSTATUS}
 fi
 
-# vim: set ts=3 sw=3 sts=3 et si ai: 

@@ -1,0 +1,155 @@
+=head1 NAME
+
+aptrigger - start up or stop applications like WebLogic, Fuego, Resin, etc
+
+=head1 SYNOPSIS
+
+Mandatory arguments in long format or short format
+
+   -[-a]pplication=[cci|puc|etc...]          set application to activate/desactivate, required
+   -[-a]pp... --[start] [-[-u]nique-log]     start application with unique log (not err stdout)
+   -[-a]pp... --[stop] [-[-f]orced]          stop application and backup logs
+   -[-a]pp... [--status|-v]                  verify the status of domain
+   -[-a]pp... -[-t]hreaddump=COUNT,INTERVAL  send a 3 signal via kernel, COUNT times between INTERVAL
+   -[-a]pp... -[-d]ebug                      debug logs and processes in the system
+   -[-a]pp... -[-c]heck-config               check config application (see app-aptrigger.conf)
+   [--status|-v]                             verify the status of domains
+   -[-r]eport                                show an small report about domains
+   -[-l]og                                   log history of application
+   -[-m]aintenance                           execute maintenance routines
+   ... [ --mailreport | mailto=usr@dom ]     send output to mail accounts or specified mail
+   ... [ -[-q]uiet ]                         don't send output to terminal
+   [--version|-V]                            give app version
+   -[-]help                                  give this help
+   -[-r]eport                                show an small report about domains
+
+aptrigger --application=[cci | puc_p | .. ] [ --start | --stop ]
+
+aptrigger --application=[cci | puc_p | .. ] --threaddump=xSamples,xSleep 
+
+aptrigger --application=[cci | puc_p | .. ] [ --check-config | --status | --debug ]
+
+aptrigger --help
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--application=*>
+
+Especifica sobre que aplicacion se pueden 
+
+=item B<--start>
+
+Ejecuta la aplicacion como demonio, esta se alojara en segundo plano registrando el 
+archivo aptrigger.pid con el pid asignado por el sistema operativo.
+
+=item B<--stop>
+
+Si la aplicacion se esta ejecutando, entonces se busca su PID y se termina
+la aplicacion.
+
+=item B<--help>
+
+Muestra la ayuda
+
+=item B<--version>
+
+=back
+
+=head1 DESCRIPTION 
+
+ aptrigger
+ Aplicacion que sirve como auxiliar en la administracion de aplicaciones
+ basadas en WebLogic, con posibilidad de extenderla a cualquier otra aplicacion
+ que se ejecute en un sistema like UNIX*
+
+ Utiliza un directorio de configuracion, donde se almacenan los siguientes
+ archivos:
+  * aptrigger.sh
+    Aplicacion principal
+
+  * aptrigger.conf
+    Configuracion de parametros generales a la aplicacion
+
+  * [dominio]-aptrigger.conf
+    Configuracion para un dominio en particular, vease dominios.
+
+  * aptrigger.log
+    Log de ejecucion
+
+DOMINIOS
+ El archivo para configurar un dominio en particular tiene los
+ siguientes parametros posibles:
+ 
+ Para indicar cual es el shell que inicia la aplicacion
+ STARTAPP=[bin/start-app.sh]
+ 
+ Para indicar cual es el shell que detiene la aplicacion
+ STOPAPP=[stop-app.sh]
+ 
+ Si es necesario ejecutar un shell antes de iniciar la aplicacion
+ PREEXECUTION=[bin/before-start.sh]
+ 
+ La ruta del dominio
+ PATHAPP=[path/to/app/or/domain]
+ 
+ Claves para filtrar la ejecucion de la aplicacion
+ FILTERAPP=["domainUp=1"]
+ 
+ FILTERLANG=["perl"]
+ 
+ En caso de que se manejen dominios administrados, indicar con que
+ aplicacion se inicia el administrador y cual es la Clave para filtrar
+ el proceso
+ WLSAPP=[bin/app-manager.sh]
+ 
+ FILTERWL=["app=manager"]
+ 
+ Si se quiere indicar que no se genere un archivo con el stderr, o se
+ concentre toda la salida en unico archivo de bitacora
+ UNIQUELOG=[true|false]
+ 
+ Clave para verificar si la aplicacion se encuentra en ejecucion, se
+ buscara en el archivo de bitacora
+ UPSTRING=["Startup Success"]
+ 
+ Clave para verificar que la aplicacion ya no se encuentra en ejecucion,
+ se buscara en el archivo de bitacora y posteriormente el PID del proceso
+ DOWNSTRING=["thanks for using aptrigger"]
+ 
+ Tiempo de espera antes de verificar si se encuentra en ejecucion o no
+ la aplicacion
+ TOSLEEP=[0-99]
+
+=head1 EXAMPLES
+
+ Para usar aptrigger es necesario tener configurado al menos un dominio, supongamos
+ el super proyecto NOE:
+
+ * para iniciar NOE
+   $ ~/bin/aptrigger --application=wliNOEdes --start
+ 
+ * con opciones cortas
+   $ ~/bin/aptrigger -a=wliNOEdes start
+
+ * de plano si ya es muy grande la hueva (TIP)
+   $ alias noedes='~/bin/aptrigger -a=wliNOEdes'
+	$ noedes start
+
+=head1 AUTHOR
+
+ aptrigger v2.50
+ Copyright (C) 2008 MashedCode Co.
+ 
+ Incognito - Enigma
+ Written by Andres Aquino <andres.aquino@gmail.com>
+
+=head1 BUGS
+
+ Muchos!
+ 
+ Algun voluntario a encontrarlos ?
+
+=cut
+# vim: set ts=3 sw=3 sts=3 et si ai:
