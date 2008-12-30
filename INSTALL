@@ -1,0 +1,59 @@
+            _____    _
+   __ _ _ _|_   _| _(_)__ _ __ _ ___ _ _
+  / _` | '_ \| || '_| / _` / _` / -_) '_|
+  \__,_| .__/|_||_| |_\__, \__, \___|_|
+       |_|            |___/|___/
+=-=
+Aplicacion para iniciar y detener aplicaciones like init.d
+
+
+COMO INSTALAR ?
+ 
+Bajar el paquete aptrigger-v2.5Stable
+-
+ $ wget http://10.103.22.44/applications/aptrigger-v2.5Stable.tar.gz
+ 
+ 
+Ejecuta el script install.sh
+-
+ $ sh aptrigger.git/install.sh
+ 
+ó el procedimiento manual:
+ 
+ 
+Descomprimir
+-
+ $ cd $HOME
+ $ gunzip aptrigger-v2.5Stable.tar.gz
+ $ tar xvf aptrigger.git
+ 
+ 
+Renombrar directorio y cambiar permisos de ejecucion para el shell
+-
+ $ mv aptrigger.git aptrigger
+ $ chmod 0750 $HOME/aptrigger/aptrigger.sh
+ 
+ 
+Crear el directorio bin y hacer una liga al ejecutable
+-
+ $ mkdir -p $HOME/bin
+ $ cd $HOME/bin
+ $ ln -sf $HOME/aptrigger/aptrigger.sh aptrigger
+ 
+ 
+Agregar al PATH la referencia (puede agregarse a su profile si prefiere)
+_
+ $ PATH=$HOME/bin:$PATH
+ 
+ 
+Verificar instalación
+_
+ $ aptrigger -v
+ aptrigger v2.50
+ Copyright (C) 2008 MashedCode Co.
+ 
+ Incognito - Enigma
+ Written by Andrés Aquino Morales <andres.aquino@gmail.com>
+ 
+ 
+... enjoy !
