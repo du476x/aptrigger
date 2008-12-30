@@ -2,9 +2,10 @@
 # 
 # aptrigger.sh -- Monitor de Operacion y Servicios 
 # ___________________________________________________________________
-# (c) 2008 aQzero
-#
-# aQzero <aqzero@gmail.com>
+# (c) 2008 MashedCode Co.
+# 
+# Andrés Aquino Morales <andres.aquino@gmail.com>
+
 
 # [ ABSTRACT ]
 # Iniciar y detener los servicios que administra Control-M, aparentemente solo 
