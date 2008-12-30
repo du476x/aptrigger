@@ -1,11 +1,11 @@
 #!/bin/sh 
+# vim: set ts=3 sw=3 sts=3 et si ai: 
 # 
 # aptrigger.sh -- Monitor de Operacion y Servicios 
 # ___________________________________________________________________
 # (c) 2008 MashedCode Co.
-# 
-# Andrés Aquino Morales <andres.aquino@gmail.com>
-
+#
+# Andrés Aquino <andres.aquino@gmail.com>
 
 # [ ABSTRACT ]
 # Iniciar y detener los servicios que administra Control-M, aparentemente solo 
@@ -23,12 +23,11 @@ filter_in_log () {
    local SEARCHSTR
    SEARCHSTR="${1}"
    [ "${SEARCHSTR}" = "_NULL_" ] && return 1
-   cd ${PATHAPP}
    grep -q "${SEARCHSTR}" "${NAMELOG}.log"
    LASTSTATUS=$?
    if [ "${LASTSTATUS}" -eq "0" ]
    then
-      log_action "DBUG" "Looking for ${SEARCHSTR} was succesfull"
+      log_action "INFO" "Looking for ${SEARCHSTR} was succesfull"
    fi
    return ${LASTSTATUS}
 }
@@ -40,53 +39,44 @@ filter_in_log () {
 log_backup () {
    #
    # filename: aptrigger/aptrigger-cci-20080516-2230.tar.gz
-   LOG=`echo $NAMELOG | sed -e "s/aptrigger\///g"`
-   touch "${LOG}.date" 
-   cd "${PATHAPP}/${NAMEAPP}"
-   DAYOF=`date '+%Y%m%d-%H%M'`
-   if [ -e "${NAMELOG}.date" ]
+   DAYOF=`date "+%Y%m%d-%H%M"`
+   if [ -r "${NAMELOG}.date" ]
    then
       DAYOF="`cat ${NAMELOG}.date`"
    fi
-   mkdir -p "${DAYOF}"
-   touch "${LOG}.log"
-   touch "${LOG}.err"
-   touch "${LOG}.pid"
-   mv "${LOG}.log" "${LOG}.err" "${LOG}.pid" "${DAYOF}/"
-   touch "${LOG}.log"
-   LOGSIZE=`du -sk "${DAYOF}" | cut -f1`
-   RESULT=$((${LOGSIZE}/1024))
-   
-   # reportar action
-   log_action "INFO" "The sizeof ${LOG}.log is ${LOGSIZE}M, proceeding to compress"
-
-   # Si esta habilitado el fast-stop(--forced), no se comprime la informacion
-   rm -f ${LOG}.lock
-   ${FASTSTOP} && log_action "WARN" "Ups,(no compress) hurry up is to late for sysadmin !"
-   ${FASTSTOP} && return 0
+   mkdir -p ${DAYOF}
+   touch "${NAMELOG}.log"
+   touch "${NAMELOG}.err"
+   touch "${NAMELOG}.pid"
+   touch "${NAMELOG}.date"
+   mv "${NAMELOG}.log" "${NAMELOG}.err" "${NAMELOG}.pid" "${NAMELOG}.date" "${DAYOF}/"
 
    # si el tamaño del archivo .log sobrepasa los MAXLOGSIZE en megas 
    # entonces hacer un recorte para no saturar el filesystem
+   LOGSIZE=`du -sk ${NAMELOG}.log | cut -f1`
+   RESULT=$((${LOGSIZE}/1024))
    if [ ${RESULT} -gt ${MAXLOGSIZE} ]
    then
-      log_action "WARN" "The sizeof ${LOG}.log is ${LOGSIZE}M, i need reduce it to ${MAXLOGSIZE}M"
-      SIZE=$((${MAXLOGSIZE}*1024*1024))
-      tail -c${SIZE} ${DAYOF}/${LOG}.log > ${DAYOF}/${LOG}
-      rm -f ${DAYOF}/${LOG}.log
-      mv ${DAYOF}/${LOG} ${DAYOF}/${LOG}.log
+      log_action "WARN" "The sizeof ${NAMELOG}.log is ${LOGSIZE}M, i need reduce it to ${MAXLOGSIZE}M"
+      SIZE=$((${MAXLOGSIZE*1024*1024}))
+      tail -c${SIZE} ${DAYOF}/${NAMELOG}.log > ${DAYOF}/${NAMELOG}
+      rm -f ${DAYOF}/${NAMELOG}.log
+      mv ${DAYOF}/${NAMELOG} ${DAYOF}/${NAMELOG}.log
    fi
    
    #
    # por que HP/UX tiene que ser taaan soso = estupido ? ? 
    # backup de log | err | pid para análisis
    # tar archivos | gzip -c > file-log
-   $aptar cvf "${LOG}_${DAYOF}.tar" "${DAYOF}" > /dev/null 2>&1
-   $apzip -c "${LOG}_${DAYOF}.tar" > "${LOG}_${DAYOF}.tar.gz"
-   LOGSIZE=`du -sk ${LOG}_${DAYOF}.tar.gz | cut -f1`
-   log_action "INFO" "Creating ${LOG}_${DAYOF}.tar.gz file with ${LOGSIZE}M of size"
+   $aptar cvf "${NAMELOG}_${DAYOF}.tar" "${DAYOF}" > /dev/null 2>&1
+   $apzip -c "${NAMELOG}_${DAYOF}.tar" > "${NAMELOG}_${DAYOF}.tar.gz"
+   LOGSIZE=`du -sk ${NAMELOG}_${DAYOF}.tar.gz | cut -f1`
    
-   rm -f ${LOG}_${DAYOF}.tar
+   log_action "INFO" "The file ${NAMELOG}_${DAYOF}.tar.gz was created with ${LOGSIZE}M of size"
+   rm -f ${NAMELOG}_${DAYOF}.tar
    rm -fr ${DAYOF}
+   rm -f ${NAMELOG}.date
+   rm -f ${NAMELOG}.lock
 
 }
 
@@ -98,23 +88,8 @@ log_action () {
    LEVEL=${1}
    ACTION=${2}
    PID=0
-   LOGME=true
-   [ -r ${NAMELOG}.pid ] && PID=`head -n1 ${NAMELOG}.pid`
-   case "${LEVEL}" in
-      "DBUG")
-         [ "${LOGLEVEL}" = "INFO" ] && LOGME=false
-         [ "${LOGLEVEL}" = "WARN" ] && LOGME=false
-         ;;
-      "WARN")
-         [ "${LOGLEVEL}" = "INFO" ] && LOGME=false
-         ;;
-   esac
-
-   if ${LOGME}
-   then
-      echo "`date '+%Y-%m-%d'` [`date '+%H:%M:%S'`] ${APPLICATION}(${PID}): ${LEVEL} ${ACTION}" >> "$HOME/${NAMEAPP}/${NAMEAPP}.log"
-   fi
-
+   [ -r ${NAMELOG}.pid ] && PID=`tail -n1 ${NAMELOG}.pid`
+   echo "`date '+%Y-%m-%d'` [`date '+%H:%M:%S'`] ${APPLICATION}(${PID}): ${LEVEL} ${ACTION}" >> "$HOME/${NAMEAPP}/${NAMEAPP}.log"
 }
 
 
@@ -134,19 +109,18 @@ is_process_running () {
 
    if [ "`uname -s`" = "HP-UX" ]
    then
-      PROCESSES=`awk '{print "ps -fex | grep "$0" | grep -v grep"}' "${NAMELOG}.pid" | sh | grep "${FILTERLANG}" | grep "${FILTERAPP}" | grep -v grep | wc -l | cut -f1 -d" " `
+      PROCESSES=`awk '{print "ps -fex | grep "$0}' "${NAMELOG}.pid" | sh | grep "$FILTERLANG" | grep "$FILTERAPP" | wc -l | cut -f1 -d\ `
    else
-      PROCESSES=`awk '{print "ps fax | grep "$0" | grep -v grep"}' "${NAMELOG}.pid" | sh | grep "${FILTERLANG}" | grep "${FILTERAPP}" | grep -v grep | wc -l | cut -f1 -d" " `
+      PROCESSES=`awk '{print "ps -fea | grep "$0}' "${NAMELOG}.pid" | sh | grep "$FILTERLANG" | grep "$FILTERAPP" | wc -l | cut -f1 -d\ `
    fi
 
-   if [ "${PROCESSES}" -gt 0 ]
+   if [ "${PROCESSES}" != "0" ]
    then
       return "${PROCESSES}"
       log_action "INFO" "The application is running with ${PROCESSES} processes in memory"
    else
       return 0
    fi
-
 }
 
 
@@ -156,30 +130,26 @@ is_process_running () {
 get_process_id () {
    #
    # filtrar primero por APP
-   rm -f "${NAMELOG}.pid"
-   ps ${psopts} | grep "${FILTERAPP}" | grep -v "grep"  | grep -v "$NAMEAPP " > "${NAMELOG}.tmp"
+   touch "${NAMELOG}.pid"
+   ps ${psopts} | grep "${FILTERAPP}" > "${NAMELOG}.tmp"
 
    # si existe, despues por LANG
    if [ "${FILTERLANG}" != "" ]
    then
       mv "${NAMELOG}.tmp" "${NAMELOG}.tmp.1"
-      grep "${FILTERLANG}" "${NAMELOG}.tmp.1" | grep -v "grep" > "${NAMELOG}.tmp"
+      grep "${FILTERLANG}" "${NAMELOG}.tmp.1" > "${NAMELOG}.tmp"
    fi
    
-   # si existe 1 o mas procesos, entonces averiguar el PPID (Parent Process ID) 
-   # y almacenarlo, en caso contrario solo generar archivo vacio
-   touch "${NAMELOG}.pid"
-   if [ `wc -l "${NAMELOG}.tmp" | cut -f1 -d\ ` -gt 0 ]
+   # error, si el PID se deja con el nombre de la aplicacion y la fecha, cuando se quiera
+   # dar de baja, los PID's se van a buscar en el archivo incorrecto (supongamos 1 día 
+   # despues ...), es mejor dejar el archivo sin fecha; cuando se baje el proceso entonces
+   # se respaldan los archivos con la fecha y hora de baja del proceso
+   if [ `wc -l "${NAMELOG}.tmp" | cut -f1 -d\ ` -gt "0" ]
    then
-      log_action "DBUG" "The application still remains in memory ... "
-      awk '{print $2}' "${NAMELOG}.tmp" > "${NAMELOG}.tmp.1"
-      # FIX: sacar el proceso padre, ordenando los process id y sacando el primero
-      cat "${NAMELOG}.tmp.1" | sort -n | head -n1 > "${NAMELOG}.pid"
-      # FIX: para el caso de iPlanet, es necesario conservar todos los pids implicados
-      #       y así poder obtener el último pid para aplicar un FTD
-      cat "${NAMELOG}.tmp.1" | sort -nr > "${NAMELOG}.plist"
+      awk '{print $2}' "${NAMELOG}.tmp" > "${NAMELOG}.pid"
    fi
    rm -f "${NAMELOG}.tmp" "${NAMELOG}.tmp.1"
+
 }
 
 
@@ -209,9 +179,21 @@ check_configuration () {
    [ -d ${PATHAPP} ] || LASTSTATUS=1
 
    return ${LASTSTATUS}
-
 }
 
+
+#
+# check_space_on_disk
+# verificar si existe suficiente espacio en HD para la ejecución
+check_space_on_disk() {
+   # Filesystem          kbytes    used   avail %used Mounted on
+   # /dev/vg00/lvol3     524288  156792  364680   30% /
+   # /dev/vg00/lvol1     251696   50064  176456   22% /stand
+   # /dev/vg00/lvol9   10240000 7874076 2292474   77% /opt/weblogicsp4
+   # bdf ${APPPARTITION} | grep '' | awk '{}'
+   echo ""
+
+}
 
 #
 # verificar que el servidor weblogic (en el caso de los appsrv's se encuentre arriba y operando,
@@ -229,18 +211,16 @@ check_weblogicserver() {
             WLPROCESS=`ps -fea | grep "${FILTERWL}" | wc -l | cut -f1 -d\ `
          fi
          
-         # si no es así, levantar el servidor y esperar 3 minuto
-         WLSLEEP=60*3
+         # si no es así, levantar el servidor y esperar 1 minuto
          if [ ${WLPROCESS} -eq "0" ]
          then
             log_action "WARN" "Dont exists an application server manager of WebLogic, starting an instance of"
             nohup sh ${WLSAPP} 2> ${NAMELOG}-WLS.err > ${NAMELOG}-WLS.log &
-            sleep ${WLSLEEP}
+            sleep 60
          fi
    fi
 
 }
-
 
 #
 # realizar un kernel full thread dump sobre el proceso indicado.
@@ -251,21 +231,13 @@ check_weblogicserver() {
 make_fullthreaddump() {
    # obtener el PID
    cd ${PATHAPP}
-   
-   # para cuando son procesos JAVA StandAlone (WL, Tomcat, etc...) 
-   log_action "DBUG" "Change to ${PATHAPP}"
    [ -r ${NAMELOG}.pid ] && PID=`tail -n1 ${NAMELOG}.pid`
-
-   # para cuando son procesos ONDemand (iPlanet, ...)
-   [ -r ${NAMELOG}.plist -a ${FILTERAPP} ] && PID=`head -n1 ${NAMELOG}.pid`
    
    # hacer un mark para saber desde donde vamos a sacar datos del log
    ftdFILE="${NAMELOG}_`date '+%Y%m%d-%H%M%S'`.ftd"
-   touch "${ftdFILE}"
-   log_action "DBUG" "Taking ${NAMELOG}.log to extract the FTP on ${ftdFILE}"
    tail -f "${NAMELOG}.log" > ${ftdFILE} &
 
-   # enviar el FTD al PID, N muestras cada T segs
+   # enviar el FTD al PID, 3 muestras cada 20 segs
    times=0
    timeStart=`date`
    while [ $times -ne $MAXSAMPLES ]
@@ -282,14 +254,14 @@ make_fullthreaddump() {
    then
       PROCESSES=`ps -fex | grep "tail -f ${NAMELOG}.log" | grep -v grep | awk '/tail/{print $2}'`
    else
-      PROCESSES=`ps fax | grep "tail -f ${NAMELOG}.log" | grep -v grep | awk '/tail/{print $2}'`
+      PROCESSES=`ps -fea | grep "tail -f ${NAMELOG}.log" | grep -v grep | awk '/tail/{print $2}'`
    fi
    kill -15 ${PROCESSES}
   
    #
    # generar encabezado y limpiar basura
    tFILE=`wc -l ${ftdFILE} | awk '{print $1}'`
-   gFILE=`nl -ba ${ftdFILE} | grep "Full thread dump" | grep "Java HotSpot" | head -n1 | awk '{print $1}'`
+   gFILE=`nl -ba ${ftdFILE} | grep "Full thread dump Java" | head -n1 | awk '{print $1}'`
    total=$(($tFILE-$gFILE+1))
    log_action "DBUG" "Total: $total, where tFile=$tFILE and gFile=$gFILE"
    tail -n${total} ${ftdFILE} > ${ftdFILE}.tmp
@@ -304,6 +276,8 @@ make_fullthreaddump() {
    echo "Smpl: ${MAXSAMPLES}" >> ${ftdFILE}
    echo "-------------------------------------------------------------------------------" >> ${ftdFILE}
    cat ${ftdFILE}.tmp >> ${ftdFILE}
+   $apzip -q -c ${ftdFILE} > ${ftdFILE}.gz
+   log_action "INFO" "Creating a .gzip of $ftdFILE for save space"
  
    # enviar por correo 
    if [ "${MAILACCOUNTS}" != "_NULL_" ]
@@ -311,12 +285,10 @@ make_fullthreaddump() {
       $apmail -s "${APPLICATION} FULL THREAD DUMP ${timeStart} (${ftdFILE})" "${MAILACCOUNTS}" < ${ftdFILE} > /dev/null 2>&1 &
       log_action "INFO" "Sending a full thread dump(${ftdFILE}) by mail to ${MAILACCOUNTS}"
    fi
-   #rm -f ${ftdFILE}
+   rm -f ${ftdFILE}
    rm -f ${ftdFILE}.tmp
    return 0
-
 }
-
 
 #
 # report_status
@@ -353,24 +325,20 @@ report_status () {
 #
 # obtiene la version de la aplicación
 show_version () {
-   # como ya cambie de SVN a GIT, no puedo usar el Id keyword, entonces ... a pensar en otra opcion ! ! ! 
-   IDAPP='$Id$'
-   
-   #VERSIONAPP=`echo $IDAPP | awk '{print $3}'`
-   VERSIONAPP="250"
+   IDAPP='$Id: aptrigger.sh 186 2008-08-09 22:22:02Z andresaquino $'
+   VERSIONAPP=`echo $IDAPP | awk '{print $3}'`
    UPVERSION=`echo ${VERSIONAPP} | sed -e "s/..$//g"`
    LWVERSION=`echo ${VERSIONAPP} | sed -e "s/^.//g"`
-   LASTSONG="Incognito - Enigma"
+   LASTSONG="lie to me -- 12 stones"
    echo "${NAMEAPP} v${UPVERSION}.${LWVERSION}"
-   echo "Copyright (C) 2008\n"
+   echo "Copyright (C) 2008 Mashed Code\n"
 
    # como a mi jefe le caga que en los logs anexe mi correo, pues se lo quitamos 
    if ${SVERSION}
    then
       echo "${LASTSONG}"
-      echo "Written by Andrés Aquino Morales <andres.aquino@gmail.com>\n"
+      echo "Written by Andres Aquino <andres.aquino@gmail.com>\n"
    fi
-
 }
 
 
@@ -392,7 +360,6 @@ show_status () {
       echo "${APPLICATION} is not running." >> ${REPORT}
       return 1
    fi
-
 }
 
 
@@ -426,7 +393,6 @@ START=false
 STOP=false
 STATUS=false
 NOTFORCE=true
-FASTSTOP=false
 VIEWLOG=true
 MAILACCOUNTS="_NULL_"
 FILTERWL="_NULL_"
@@ -437,11 +403,7 @@ ERROR=true
 MAXLOGSIZE=500
 THREADDUMP=false
 VIEWREPORT=false
-VIEWHISTORY=false
-MAINTENANCE=false
-LOGLEVEL="DBUG"
 SVERSION=false
-APPTYPE="STAYRESIDENT"
 UNIQUELOG=false
 PREEXECUTION="_NULL_"
 OPTIONS="Options used when aptrigger was called:"
@@ -462,10 +424,9 @@ apzip=`which gzip`
 apmail=`which mail`
 psopts="-fea"
 bdf="df"
-typeso="`uname -s`"
-[ "${typeso}" = "HP-UX" ] && apmail=`which mailx`
-[ "${typeso}" = "HP-UX" ] && bdf="bdf"
-[ "${typeso}" = "HP-UX" ] && psopts="-fex"
+[ "`uname -s`" = "HP-UX" ] && apmail=`which mailx`
+[ "`uname -s`" = "HP-UX" ] && bdf="bdf "
+[ "`uname -s`" = "HP-UX" ] && psopts="-fex"
 
 # Leer parametros 
 while [ $# -gt 0 ]
@@ -475,9 +436,9 @@ do
          APPLICATION=`echo "$1" | sed 's/^--[a-z-]*=//'`
          APPLICATION=`echo "${APPLICATION}" | sed 's/^-a=//'`
          NAMELOG="${NAMEAPP}/${APPLICATION}"
-         ERROR=false
+         eRROR=false
          ;;
-         
+      
       start|--start)
          START=true
          ERROR=false
@@ -496,7 +457,7 @@ do
          fi
          ;;
          
-      status|--status|-s)
+      -v|--status)
          STATUS=true
          ERROR=false
          if ${START} || ${STOP} || ${CHECKCONFIG}
@@ -504,26 +465,8 @@ do
             ERROR=true
          fi
          ;;
-         
-      log|--log|-l)
-         VIEWHISTORY=true
-         ERROR=false
-         if ${START} || ${STOP} || ${CHECKCONFIG} || ${STATUS}
-         then
-            ERROR=true
-         fi
-         ;;
-         
-      maintenance|--maintenance|-m)
-         MAINTENANCE=true
-         ERROR=false
-         if ${START} || ${STOP} || ${CHECKCONFIG} || ${STATUS}
-         then
-            ERROR=true
-         fi
-         ;;
-         
-      report|--report|-r)
+
+      -r|--report)
          VIEWREPORT=true
          ERROR=false
          if ${START} || ${STOP} || ${CHECKCONFIG} || ${STATUS}
@@ -531,18 +474,17 @@ do
             ERROR=true
          fi
          ;;
-         
-      fast|--forced|-f)
+     
+      -f|--forced)
          NOTFORCE=false
-         FASTSTOP=true
          ERROR=false
          ;;
-         
-      --unique-log|-u)
+
+      -u|--unique-log)
          UNIQUELOG=true
          ERROR=false
          ;;
-         
+
       -t=*|--threaddump|--threaddump=*)
          THREADDUMP=true
          ERROR=false
@@ -558,24 +500,24 @@ do
             ERROR=true
          fi
          ;;
-         
+      
       --mailto=*)
          MAILACCOUNTS=`echo "$1" | sed 's/^--[a-z-]*=//'`
          ERROR=false
          ;;
-         
+
       --mailreport)
          MAILACCOUNTS="${MAILTOADMIN} ${MAILTODEVELOPER} ${MAILTORADIO}"
          VIEWLOG=false
          ERROR=false
          ;;
-         
-      quiet|--quiet|-q)
+      
+      -q|--quiet)
          VIEWLOG=false
          ERROR=false
          ;;
-         
-      debug|--debug|-d)
+
+      -d|--debug)
          DEBUG=true
          ERROR=false
          if ${START} || ${STOP} || ${STATUS}
@@ -583,8 +525,8 @@ do
             ERROR=true
          fi
          ;;
-         
-      --check-config|-c)
+
+      -c|--check-config)
          CHECKCONFIG=true
          ERROR=false
          if ${START} || ${STOP} || ${STATUS} 
@@ -592,14 +534,14 @@ do
             ERROR=true
          fi
          ;;
-         
-      --version|-v)
+      
+      -V|--version)
          SVERSION=true
          show_version
          exit 0
          ;;
-         
-      --help|-h)
+
+      -h|--help)
          ERROR=false
          if ${START} || ${STOP} || ${STATUS} || ${CHECKCONFIG}
          then
@@ -625,7 +567,7 @@ do
          fi
          exit 0
          ;;
-         
+
       *)
          ERROR=true
          ;;
@@ -647,13 +589,11 @@ else
       check_configuration "${APPLICATION}" false
       [ "$?" -ne "0" ] && CHECKCONFIG=true
       [ "${TOSLEEP}" -eq "0" ] && TOSLEEP=5
-      TOSLEEP="$((60*$TOSLEEP))"
+      TOSLEEP="$((30*$TOSLEEP))"
    else
       CANCEL=true
       ${STATUS} && CANCEL=false
       ${VIEWREPORT} && CANCEL=false
-      ${VIEWHISTORY} && CANCEL=false
-      ${VIEWLOG} && CANCEL=false
       if ${CANCEL}
       then
          echo "Usage: ${NAMEAPP} --application=[cci|puc|...] [--start|--stop|--status] [--help]"
@@ -700,7 +640,6 @@ else
       #
       # que sucede si intentan dar de alta el proceso nuevamente
       # verificamos que no exista un bloqueo (Dummies of Proof) 
-      TOSLEEP="$(($TOSLEEP*2))"
       is_process_running
       LASTSTATUS=$?
       if [ -e "${NAMELOG}.lock" ]
@@ -730,9 +669,6 @@ else
             exit 0
          fi
       fi
-
-      cd ${PATHAPP}
-      mkdir -p "${NAMEAPP}"
       
       #
       # ejecutar el shell para iniciar la aplicación y verificar que esta exista
@@ -740,27 +676,25 @@ else
       then
          # si se indican la variables, entonces
          # verificar que el weblogic server este ejecutandose
-         [ $WLSAPP ] && check_weblogicserver
-         
+         check_weblogicserver
+
          # 
          # ejecutar el PREEXECUTION
          if [ ${PREEXECUTION} != "_NULL_" ]
          then
-            log_action "INFO" "Executing ${PREEXECUTION} before any app"
             PRELOG="${PATHAPP}/${NAMELOG}.pre"
             sh ${PREEXECUTION} > ${PRELOG} 2>&1 
+            log_action "WARN" "Executing of pre ${PREEXECUTION}"
          fi
          
          #
          # iniciar la aplicación
          if ${UNIQUELOG}
          then
-            log_action "INFO" "Executing ${STARTAPP} with ${NAMELOG}.log as logfile, with unique output ..." 
             export UFILELOG="${PATHAPP}/${NAMELOG}.log"
             export EFILELOG="${PATHAPP}/${NAMELOG}.log"
             nohup sh ${STARTAPP} > ${NAMELOG}.log 2>&1 &
          else
-            log_action "INFO" "Executing ${STARTAPP} with ${NAMELOG}.log as logfile, with separate log ..."
             export UFILELOG="${PATHAPP}/${NAMELOG}.log"
             export EFILELOG="${PATHAPP}/${NAMELOG}.err"
             nohup sh ${STARTAPP} 2> ${NAMELOG}.err > ${NAMELOG}.log &
@@ -769,8 +703,9 @@ else
          # summary en lock para un post-analisis
          echo "${OPTIONS}" > "${NAMELOG}.lock"
          echo "\nDate:\n`date '+%Y%m%d %H:%M'`" >> "${NAMELOG}.lock"
+         log_action "INFO" "The application is starting"
       fi
-
+      
       #
       # a trabajar ... !
       LASTSTATUS=1
@@ -800,11 +735,6 @@ else
       # le avisamos a los admins 
       [ "${LASTSTATUS}" -ne "0" ] && DEBUG=true
       report_status "STARTUP" "${LASTSTATUS}"
-      # CASO ESPECIAL
-      # SI LA APLPICACION CORRE UNA SOLA VEZ, ELIMINAR EL .lock
-      [ $APPTYPE = "RUNONCE" ] && rm -f "${NAMELOG}.lock"
-      [ $APPTYPE = "RUNONCE" ] && log_backup
-
    fi
    
 
@@ -818,16 +748,8 @@ else
       #
       # que sucede si intentan dar de baja el proceso nuevamente
       # verificamos que exista un bloqueo (DoP) y PID
-      log_action "INFO" "Stopping the application, please wait ..."
-      TOSLEEP="$(($TOSLEEP/2))"
       is_process_running
-      if [ `wc -l "${NAMELOG}.pid" | cut -f1 -d\ ` -le 0 ]
-      then
-         echo "uh, ${NAMEAPP} is not running currently, tip: aptrigger --report"
-         log_action "INFO" "The application is down"
-         exit 0
-      fi
-      
+      [ ! -e "${NAMELOG}.pid" ] && exit 0
       
       #
       # verificar que la aplicación para hacer shutdown se encuentre en el dir 
@@ -845,7 +767,7 @@ else
          then
             STRSTATUS="NORMAL SHUTDOWN"
             sh ${STOPAPP} >> ${NAMELOG}.log 2>&1 &
-            log_action "INFO" "Shutdown application, please wait..."
+            log_action "INFO" "The application is shutdown"
          fi
          
          #
@@ -867,34 +789,17 @@ else
                ${VIEWLOG} && echo "${LINE}" 
                LINE="$LASTLINE"
             fi
-            
-            # tiempo a esperar para refrescar out en la pantalla
             sleep 2
-            
-            ONSTOP="$((${ONSTOP}+1))"
-            log_action "DBUG" "uhmmm, OnStop = ${ONSTOP} vs ToSleep = ${TOSLEEP}"
-            if [ ${ONSTOP} -gt ${TOSLEEP} ]
-            then 
-               INWAIT=false
-               log_action "WARN" "We have a problem Houston, the app stills remains in memory !"
-            fi
+            ONSTOP="$(($ONSTOP+1))"
+            [ $ONSTOP -ge $TOSLEEP ] && INWAIT=false
             LASTLINE="`tail -n1 ${NAMELOG}.log`"
          done
       fi
-     
 
       #
       # si no se cancelo el proceso por la buena, entonces pasamos a la mala
       if [ "${LASTSTATUS}" -ne "0" ]
       then
-         # si el stop es con FORCED, y es una aplicacion JAVA enviar FTD
-         if [ "$FILTERLANG" = "java" ]
-         then
-            # TODO: es necesario que sean HC(HardCode) o las dejamos en el archivo de configuracion
-            log_action "INFO" "before kill the baby, we sending 3 FTD's between 8 secs"
-            ~/bin/aptrigger --application=${APPLICATION} --threaddump=3,8
-         fi
-
          log_action "WARN" "time to using the secret weapon baby: _KILL'EM ALL_ !"
          # a trabajar ... 
          LASTSTATUS=1
@@ -904,10 +809,9 @@ else
          do
             #
             # obtenemos los PID, armamos los kills y shelleamos
-            is_process_running
             awk '{print "kill -9 "$0}' "${NAMELOG}.pid" | sh
             sleep 2
-            ${VIEWLOG} && tail -n10 "${NAMELOG}.log"
+            ${VIEWLOG} && tail -n10 ${NAMELOG}.log
             
             # checar si existen los PID's, por si el archivo no regresa el shutdown
             is_process_running
@@ -925,9 +829,7 @@ else
       report_status "${STRSTATUS}" "${LASTSTATUS}"
    fi
    
-   
-   
-   
+
    #
    # Verificar el status de la aplicación
    if ${STATUS} 
@@ -963,172 +865,52 @@ else
          rm -f ${REPORT}
       fi
    fi
-   
-   
-   
-   
+
    #
    # Generar un reporte de aplicaciones ejecutandose
-   #
-   # PULGOSA
-   #
-   # SERVER        | EXECUTED      | PID   | STATS | FILESYSTEM                      
-   # --------------+---------------+-------+-------+---------------------------
-   # test          | 20080924-0046 |       | DOWN  | 0/ 21520/ 65575 Mb              
+   # MEXHPDS2
+   # 10.103.2.52
+   # --
    # ...
    if ${VIEWREPORT} 
    then
+      # si no se da el parametro --application, se busca en el aptrigger los .conf y se consulta su estado
       cd $HOME
       apphost=`hostname | tr "[:lower:]" "[:upper:]"`
       appipmc=`echo $SSH_CONNECTION | cut -f3 -d" "`
       appuser=`id -u -n`
-      # checando el estado de las aplicaciones
-      ~/bin/aptrigger --status > /dev/null 2>&1
-      echo "\n"
-      echo "${apphost}"
-      echo "${appipmc}"
-      echo "SERVER:EXECUTED:PID:STATS:FILESYSTEM" | 
-         awk 'BEGIN{FS=":";OFS="| "}
-               {
-                  print substr($1"              ",1,14),
-                        substr($2"              ",1,14),
-                        substr($3"              ",1,6),
-                        substr($4"              ",1,6),
-                        substr($5"                                         ",1,32)
-               }'
-      echo "--------------+---------------+-------+-------+---------------------------"
+      touch .report
+      echo "---------------------------------------------------------------------------" > .report
+      echo "${apphost}" >> .report
+      echo "${appipmc}" >> .report
+      echo "---------------------------------------------------------------------------" >> .report
+      #echo "USER:MODULE:PID:STATUS:PATH" | awk 'BEGIN{FS=":";OFS="| "}{print substr($1"             ",1,12),substr($2"             ",1,12),substr($3"           ",1,6),substr($4"         ",1,7),$5}'>> .report
+      echo "USER:MODULE:PID:STATUS:FILESYSTEM" | awk 'BEGIN{FS=":";OFS="| "}{print substr($1"             ",1,12),substr($2"             ",1,16),substr($3"           ",1,6),substr($4"         ",1,7),substr($5"                                         ",1,31)}'>> .report
+      echo "---------------------------------------------------------------------------" >> .report
       for app in aptrigger/*-aptrigger.conf
       do
          appname=`basename ${app%-aptrigger.*}`
-         apppath=`awk 'BEGIN{FS="="} /^PATHAPP/{print $2}' ${app}`
+         apppath=`awk 'BEGIN{FS="="} /PATHAPP/{print $2}' ${app}`
          
          # verificar que exista el PID del usuario
          touch "${apppath}/aptrigger/${appname}.pid"
-         touch "${apppath}/aptrigger/${appname}.date"
-         # si el PID file existe y es mayor a 0, entonces es un proceso valido
-         pidsize=`du -s "${apppath}/aptrigger/${appname}.pid" | cut -f1`
-         appdate=`cat "${apppath}/aptrigger/${appname}.date"`
-         apppidn=`cat "${apppath}/aptrigger/${appname}.pid"`
-         [ ${pidsize} -ne "0" ] && appstat="UP" || appstat="DOWN"
+         apppidn=`cat ${apppath}/aptrigger/${appname}.pid`
+         ~/bin/aptrigger --application=${appname} --status --quiet
+         appstat="$?"
+         [ "${appstat}" -eq "0" ] && appstat="OK" || appstat="ERR"
          
          # calcular cuanto espacio ocupa el dominio en el filesystem
          cd $apppath
-         appsize=`du -sk . 2>/dev/null | awk '{print ($1/1024)}' | sed -e "s/\.[0-9]*//g"`
-         appfsiz=`${bdf} . | awk '/dev/{print "/ "int($4/1024)"/ "int($2/1024)" Mb "}' | sed -e "s/\.[0-9]*//g"`
+         appsize=`du -sk . 2>/dev/null | awk '{print ($1/1024)}' | sed -e "s/\.[0-9]*//g`
+         appfsiz=`${bdf} . | awk '/dev/{print "/ "int($4/1024)"/ "int($2/1024)" Mb "}' | sed -e "s/\.[0-9]*//g`
 
          cd $HOME
-         echo "${appname}:${appdate}:${apppidn}:${appstat}:${appsize}${appfsiz}" | 
-            awk 'BEGIN{FS=":";OFS="| "}
-               {
-                  print substr($1"              ",1,14),
-                        substr($2"              ",1,14),
-                        substr($3"              ",1,6),
-                        substr($4"              ",1,6),
-                        substr($5"                                         ",1,32)
-               }'
+         echo "${appuser}:${appname}:${apppidn}:${appstat}:${appsize}${appfsiz}" |awk 'BEGIN{FS=":";OFS="| "}{print substr($1"             ",1,12),substr($2"                 ",1,16),substr($3"           ",1,6),substr($4"        ",1,7),$5}' >> .report
+      done
+      echo "---------------------------------------------------------------------------" >> .report
+      cat .report
+   fi
  
-      done
-      echo ""
-   fi
-   
-   
-   
-   
-   #
-   # Generar un reporte de aplicaciones historico de operaciones realizadas
-   #
-   # PULGOSA
-   #
-   # DATE     | STOP  | START | SERVER             | BACKUP
-   # ---------+-------+-------+--------------------+---------------------------
-   # 20080924 | 0046  | 0120  | test               | test_20080924_0120.tar.gz
-   # ...
-   if ${VIEWHISTORY} 
-   then
-      cd ${HOME}
-      apphost=`hostname | tr "[:lower:]" "[:upper:]"`
-      appipmc=`echo $SSH_CONNECTION | cut -f3 -d" "`
-      appuser=`id -u -n`
-      # checando el estado de las aplicaciones
-      ~/bin/aptrigger --status > /dev/null 2>&1
-      echo "\n"
-      echo "${apphost}"
-      echo "${appipmc}"
-      echo "STOP:START:SERVER" | 
-         awk 'BEGIN{FS=":";OFS="| "}
-               {
-                  print substr($1"                     ",1,18),
-                        substr($2"                     ",1,18),
-                        substr($3"                     ",1,7);
-               }'
-      echo "------------------+-------------------------------------------------"
-      tail -n600 "aptrigger/${NAMEAPP}.log" |  tr -d ":[]()-" | \
-             awk 'BEGIN{LAST="";OFS="| "}
-               /SUCCESS/{
-                  if($0~"STARTUP")
-                  {
-                     LDATE=$1;
-                     LTIME=$2;
-                  }
-                  else
-                  {
-                     print substr(LDATE"                  ",1,9),
-                           substr(LTIME"                  ",1,7),
-                           substr($1"                ",1,9),
-                           substr($2"                ",1,7),
-                           substr($3"                  ",1,14);
-                  }
-               }' > .aptrigger.history
-
-      if [ "${APPLICATION}" = "NONSETUP" ]
-      then
-         cat .aptrigger.history | uniq | sort -r  | head -n22
-      else
-         cat .aptrigger.history | uniq | sort -r  | head -n22 | grep "${APPLICATION} "
-      fi
-      echo ""
-   fi
-   
-   
-   
-   
-   # ejecutar el mantenimiento
-   # eliminar archivos de log que sean mayores a 4 dias
-   # find . -name '${nameapp}*.tar.gz' -mtime +4 -type f -exec 
-   if ${MAINTENANCE}
-   then 
-      cd $HOME
-      # mantenimiento de logs principal
-      for app in aptrigger/*-aptrigger.conf
-      do
-         cd $HOME
-         . ${app}
-         app=`basename ${app%-aptrigger.*}`
-         APPLICATION=$app
-         cd $PATHAPP
-         log_action "WARN" "Executing maintenance of application logs..."
-         find . -name "*-*.tar.gz" -mtime +4 -type f -print | while read flog
-         do
-            rm -f ${flog} && log_action "WARN" " deleting ${flog}"
-            echo " deleting ${flog}"
-         done
-         
-         find . -name "*-*.ftd" -mtime +4 -type f -print | while read flog
-         do
-            rm -f ${flog} && log_action "WARN" " deleting ${flog}"
-            echo " deleting ${flog}"
-         done
-      done
-      # mantenimiento de logs de aplicaciones en base a shell-plugins
-      #for mplugin in aptrigger/*-maintenance.plug
-      #do
-      #   sh ${mplugin}
-      #done
-
-   fi
-   
-   
-   
    
    #
    # Depurar la aplicación
@@ -1142,7 +924,8 @@ else
       touch "${NAMELOG}.date"
  
       FLDEBUG="${NAMEAPP}/${APPLICATION}.debug"
-      echo "\n\n">> ${FLDEBUG}
+      echo "-------------------------------------------------------------------------------" > ${FLDEBUG}
+      echo "-------------------------------------------------------------------------------" >> ${FLDEBUG}
       echo "DEBUG" >> ${FLDEBUG}
       echo "-------------------------------------------------------------------------------" >> ${FLDEBUG}
       echo "  " >> ${FLDEBUG}
@@ -1154,7 +937,7 @@ else
       echo "  " >> ${FLDEBUG}
       echo "CONFIGURATION" >> ${FLDEBUG}
       echo "-------------------------------------------------------------------------------" >> ${FLDEBUG}      
-      ~/bin/aptrigger --application=${APPLICATION} --check-config >> ${FLDEBUG}
+      check_configuration "${APPLICATION}" true >> ${FLDEBUG}
       echo "  " >> ${FLDEBUG}
       echo "list of dir ${PATHAPP}/${NAMEAPP}" >> ${FLDEBUG}
       ls -l ${NAMEAPP} >> ${FLDEBUG} 2>&1
@@ -1207,4 +990,3 @@ else
    exit ${LASTSTATUS}
 fi
 
-# vim: set ts=3 sw=3 sts=3 et si ai: 
