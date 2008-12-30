@@ -1,46 +1,33 @@
 #!/bin/sh 
+# vim: set ts=3 sw=3 sts=3 et si ai: 
 # 
 # aptrigger.sh -- Monitor de Operacion y Servicios 
 # ___________________________________________________________________
 # (c) 2008 MashedCode Co.
-# 
-# Andrés Aquino Morales <andres.aquino@gmail.com>
+#
+# Andrés Aquino <andres.aquino@gmail.com>
 
+# "it's evolution baby ... " -- do the evolution @ pearl jam
+# see also http://github.com/aqzero/aptrigger
 
-# [ ABSTRACT ]
-# Iniciar y detener los servicios que administra Control-M, aparentemente solo 
-# es necesario que arroje valores de 0 ó ! 0; donde se interpretará de la 
-# siguiente manera:
-#  * 0  : todo fue correcto
-#  * !0 : sucedió un error, verificar los logs
-
-# [ FUNCTIONS ]
 
 #
-# filter_in_log
-# filtrar la cadena sugerida en el log de la aplicacion
-filter_in_log () {
-   local SEARCHSTR
-   SEARCHSTR="${1}"
-   [ "${SEARCHSTR}" = "_NULL_" ] && return 1
-   cd ${PATHAPP}
-   grep -q "${SEARCHSTR}" "${NAMELOG}.log"
-   LASTSTATUS=$?
-   if [ "${LASTSTATUS}" -eq "0" ]
-   then
-      log_action "DBUG" "Looking for ${SEARCHSTR} was succesfull"
-   fi
-   return ${LASTSTATUS}
-}
+# path y name de la aplicacion
+APPNAME="`basename ${0%.*}`"
+APPPATH="${HOME}/${APPNAME}"
 
+#
+# load some libraries
+. ${APPPATH}/utils.lib.sh
+. ${APPPATH}/${APPNAME}.conf
 
 #
 # log_backup
 # respaldar logs para que no se generen problemas de espacio.
 log_backup () {
    #
-   # filename: aptrigger/aptrigger-cci-20080516-2230.tar.gz
-   LOG=`echo $NAMELOG | sed -e "s/aptrigger\///g"`
+   # filename: ${NAMEAPP}/${NAMEAPP}-cci-20080516-2230.tar.gz
+   LOG=`echo $NAMELOG | sed -e "s/${NAMEAPP}\///g"`
    touch "${LOG}.date" 
    cd "${PATHAPP}/${NAMEAPP}"
    DAYOF=`date '+%Y%m%d-%H%M'`
@@ -92,109 +79,17 @@ log_backup () {
 
 
 #
-# guess !
-# solo un estupido wrap por que el logger del SO no tenemos chance de usarlo ... 
-log_action () {
-   LEVEL=${1}
-   ACTION=${2}
-   PID=0
-   LOGME=true
-   [ -r ${NAMELOG}.pid ] && PID=`head -n1 ${NAMELOG}.pid`
-   case "${LEVEL}" in
-      "DBUG")
-         [ "${LOGLEVEL}" = "INFO" ] && LOGME=false
-         [ "${LOGLEVEL}" = "WARN" ] && LOGME=false
-         ;;
-      "WARN")
-         [ "${LOGLEVEL}" = "INFO" ] && LOGME=false
-         ;;
-   esac
-
-   if ${LOGME}
-   then
-      echo "`date '+%Y-%m-%d'` [`date '+%H:%M:%S'`] ${APPLICATION}(${PID}): ${LEVEL} ${ACTION}" >> "$HOME/${NAMEAPP}/${NAMEAPP}.log"
-   fi
-
-}
-
-
-#
-# is_process_running
-# verificar si un proceso se encuenta ejecutandose en base a su PID
-is_process_running () {
-   #
-   # obtener los PID del proceso 
-   get_process_id
-   if [ ! -e "${NAMELOG}.pid" ]
-   then
-      [ $VIEWLOG ] && echo "The application is not running actually"
-      log_action "INFO" "The application is down"
-      exit 0
-   fi
-
-   if [ "`uname -s`" = "HP-UX" ]
-   then
-      PROCESSES=`awk '{print "ps -fex | grep "$0" | grep -v grep"}' "${NAMELOG}.pid" | sh | grep "${FILTERLANG}" | grep "${FILTERAPP}" | grep -v grep | wc -l | cut -f1 -d" " `
-   else
-      PROCESSES=`awk '{print "ps fax | grep "$0" | grep -v grep"}' "${NAMELOG}.pid" | sh | grep "${FILTERLANG}" | grep "${FILTERAPP}" | grep -v grep | wc -l | cut -f1 -d" " `
-   fi
-
-   if [ "${PROCESSES}" -gt 0 ]
-   then
-      return "${PROCESSES}"
-      log_action "INFO" "The application is running with ${PROCESSES} processes in memory"
-   else
-      return 0
-   fi
-
-}
-
-
-#
-# get_process_id
-# obtener los PID de las aplicaciones
-get_process_id () {
-   #
-   # filtrar primero por APP
-   rm -f "${NAMELOG}.pid"
-   ps ${psopts} | grep "${FILTERAPP}" | grep -v "grep"  | grep -v "$NAMEAPP " > "${NAMELOG}.tmp"
-
-   # si existe, despues por LANG
-   if [ "${FILTERLANG}" != "" ]
-   then
-      mv "${NAMELOG}.tmp" "${NAMELOG}.tmp.1"
-      grep "${FILTERLANG}" "${NAMELOG}.tmp.1" | grep -v "grep" > "${NAMELOG}.tmp"
-   fi
-   
-   # si existe 1 o mas procesos, entonces averiguar el PPID (Parent Process ID) 
-   # y almacenarlo, en caso contrario solo generar archivo vacio
-   touch "${NAMELOG}.pid"
-   if [ `wc -l "${NAMELOG}.tmp" | cut -f1 -d\ ` -gt 0 ]
-   then
-      log_action "DBUG" "The application still remains in memory ... "
-      awk '{print $2}' "${NAMELOG}.tmp" > "${NAMELOG}.tmp.1"
-      # FIX: sacar el proceso padre, ordenando los process id y sacando el primero
-      cat "${NAMELOG}.tmp.1" | sort -n | head -n1 > "${NAMELOG}.pid"
-      # FIX: para el caso de iPlanet, es necesario conservar todos los pids implicados
-      #       y así poder obtener el último pid para aplicar un FTD
-      cat "${NAMELOG}.tmp.1" | sort -nr > "${NAMELOG}.plist"
-   fi
-   rm -f "${NAMELOG}.tmp" "${NAMELOG}.tmp.1"
-}
-
-
-#
 # check_configuration
 # corroborar que los parametros/archivos sean correctos y existan en el filesystem
 check_configuration () {
-   local LASTSTATUS APPLICATION FILESETUP VERBOSE PARAM
+   local LASTSTATUS PROCNAME FILESETUP VERBOSE PARAM
    LASTSTATUS=1
-   APPLICATION="${1}"
+   PROCNAME="${1}"
    VERBOSE="${2}"
    
-   "${VERBOSE}" && echo "Checking configuration of ${APPLICATION}"
+   "${VERBOSE}" && echo "Checking configuration of ${PROCNAME}"
    # existe el archivo de configuracion ?
-   FILESETUP="$HOME/${NAMEAPP}/${APPLICATION}-aptrigger.conf"
+   FILESETUP="$HOME/${NAMEAPP}/${PROCNAME}-${NAMEAPP}.conf"
    [ -r "${FILESETUP}" ] && . "${FILESETUP}" || return ${LASTSTATUS}
    
    # leer los parametros minimos necesarios
@@ -300,7 +195,7 @@ make_fullthreaddump() {
    echo "Host: `hostname`" >> ${ftdFILE}
    echo "ID's: `id`" >> ${ftdFILE}
    echo "Date: ${timeStart}" >> ${ftdFILE}
-   echo "Appl: ${APPLICATION}" >> ${ftdFILE}
+   echo "Appl: ${PROCNAME}" >> ${ftdFILE}
    echo "Smpl: ${MAXSAMPLES}" >> ${ftdFILE}
    echo "-------------------------------------------------------------------------------" >> ${ftdFILE}
    cat ${ftdFILE}.tmp >> ${ftdFILE}
@@ -308,7 +203,7 @@ make_fullthreaddump() {
    # enviar por correo 
    if [ "${MAILACCOUNTS}" != "_NULL_" ]
    then
-      $apmail -s "${APPLICATION} FULL THREAD DUMP ${timeStart} (${ftdFILE})" "${MAILACCOUNTS}" < ${ftdFILE} > /dev/null 2>&1 &
+      $apmail -s "${PROCNAME} FULL THREAD DUMP ${timeStart} (${ftdFILE})" "${MAILACCOUNTS}" < ${ftdFILE} > /dev/null 2>&1 &
       log_action "INFO" "Sending a full thread dump(${ftdFILE}) by mail to ${MAILACCOUNTS}"
    fi
    #rm -f ${ftdFILE}
@@ -319,53 +214,16 @@ make_fullthreaddump() {
 
 
 #
-# report_status
-# generar reporte via mail para los administradores
-report_status () {
-   local TYPEOPERATION STATUS STRSTATUS FILESTATUS 
-   TYPEOPERATION=${1}
-   STATUS=${2}
-
-   if [ "${STATUS}" -eq "0" ]
-   then
-      STRSTATUS="SUCCESS"
-      FILESTATUS="${NAMELOG}.log"
-      log_action "INFO" "The application ${TYPEOPERATION} ${STRSTATUS}"
-   else
-      STRSTATUS="FAILED"
-      FILESTATUS="${NAMELOG}.err"
-      log_action "ERR" "The application ${TYPEOPERATION} ${STRSTATUS}"
-   fi
-   
-   #
-   # solo enviar si la operacion fue correcta o no
-   echo "${APPLICATION} ${TYPEOPERATION} ${STRSTATUS}, see also ${NAMELOG}.log for information"
-   if [ "${MAILACCOUNTS}" != "_NULL_" ]
-   then
-      # y mandarlo a bg, por que si no el so se apendeja, y por este; este arremedo de programa :-P
-      $apmail -s "${APPLICATION} ${TYPEOPERATION} ${STRSTATUS}" -r "${MAILACCOUNTS}" > /dev/null 2>&1 &
-      log_action "INFO" "Report ${APPLICATION} ${TYPEOPERATION} ${STRSTATUS} to ${MAILACCOUNTS}"
-   fi
-
-}
-
-
-#
 # obtiene la version de la aplicación
 show_version () {
-   # como ya cambie de SVN a GIT, no puedo usar el Id keyword, entonces ... a pensar en otra opcion ! ! ! 
-   IDAPP='$Id$'
-   
-   #VERSIONAPP=`echo $IDAPP | awk '{print $3}'`
-   VERSIONAPP="250"
-   UPVERSION=`echo ${VERSIONAPP} | sed -e "s/..$//g"`
-   LWVERSION=`echo ${VERSIONAPP} | sed -e "s/^.//g"`
-   LASTSONG="Incognito - Enigma"
-   echo "${NAMEAPP} v${UPVERSION}.${LWVERSION}"
-   echo "Copyright (C) 2008\n"
+   local APPVERSION="`cat ${APPNAME}.ver`"
+   local APPRELEASE="`awk 'END {print $1}' CHANGELOG`"
+   local LASTSONG="do the evolution @ pearl jam"
 
-   # como a mi jefe le caga que en los logs anexe mi correo, pues se lo quitamos 
-   if ${SVERSION}
+   echo "${APPNAME} v${APPVERSION}.${APPRELEASE}"
+   echo "(c) 2008 MashedCode Co.\n"
+   # si la version se solicita por menu, entonces se muestran datos adicionales ...
+   if ${MNVERSION}
    then
       echo "${LASTSONG}"
       echo "Written by Andrés Aquino Morales <andres.aquino@gmail.com>\n"
@@ -385,96 +243,28 @@ show_status () {
    then
       WITHLOCK="out of control of ${NAMEAPP}!"
       [ -r "${NAMELOG}.lock" ] && WITHLOCK="controlled by ${NAMEAPP}."
-      echo "${APPLICATION} is running with ${PROCESSES} processes ${WITHLOCK}" >> ${REPORT}
+      echo "${PROCNAME} is running with ${PROCESSES} processes ${WITHLOCK}" >> ${REPORT}
       cat ${NAMELOG}.pid >> ${REPORT}
       return 0
    else
-      echo "${APPLICATION} is not running." >> ${REPORT}
+      echo "${PROCNAME} is not running." >> ${REPORT}
       return 1
    fi
 
 }
 
 
-#
-# MAIN
-NAMEAPP="`basename ${0%.*}`"
-TOSLEEP=0
-MAILTOADMIN=""
-MAILTODEVELOPER=""
-MAILTORADIO=""
-MAXSAMPLES=3
-MAXSLEEP=2
-
-# corroborar que no se ejecute como usuario r00t
-if [ "`id -u`" -eq "0" ]
-then
-   if [ "${MAILACCOUNTS}" = "_NULL_" ]
-   then
-      echo "Hey, i can't run as root user "
-   else
-      $apmail -s "Somebody tried to run me as r00t user" "${MAILACCOUNTS}" < "$@" > /dev/null 2>&1 &
-      log_action "WARN" "Somebod tried to run me as r00t, sending warn to ${MAILACCOUNTS}"
-   fi
-   
-fi
 
 #
-# Opciones por defecto
-APPLICATION="NONSETUP"
-START=false
-STOP=false
-STATUS=false
-NOTFORCE=true
-FASTSTOP=false
-VIEWLOG=true
-MAILACCOUNTS="_NULL_"
-FILTERWL="_NULL_"
-CHECKCONFIG=false
-STATUS=false
-DEBUG=false
-ERROR=true
-MAXLOGSIZE=500
-THREADDUMP=false
-VIEWREPORT=false
-VIEWHISTORY=false
-MAINTENANCE=false
-LOGLEVEL="DBUG"
-SVERSION=false
-APPTYPE="STAYRESIDENT"
-UNIQUELOG=false
-PREEXECUTION="_NULL_"
-OPTIONS="Options used when aptrigger was called:"
-
-#
-# Opciones por configuración
-if [ -r "$HOME/${NAMEAPP}/${NAMEAPP}.conf" ]
-then
-   . "$HOME/${NAMEAPP}/${NAMEAPP}.conf"
-else
-   . "${PWD}/${NAMEAPP}.conf"
-fi
-
-#
-# aplicaciones
-aptar=`which tar`
-apzip=`which gzip`
-apmail=`which mail`
-psopts="-fea"
-bdf="df"
-typeso="`uname -s`"
-[ "${typeso}" = "HP-UX" ] && apmail=`which mailx`
-[ "${typeso}" = "HP-UX" ] && bdf="bdf"
-[ "${typeso}" = "HP-UX" ] && psopts="-fex"
-
-# Leer parametros 
+# MAIN 
 while [ $# -gt 0 ]
 do
    case "${1}" in
       -a=*|--application=*)
-         APPLICATION=`echo "$1" | sed 's/^--[a-z-]*=//'`
-         APPLICATION=`echo "${APPLICATION}" | sed 's/^-a=//'`
-         NAMELOG="${NAMEAPP}/${APPLICATION}"
+         PROCNAME=`echo "$1" | sed 's/^--[a-z-]*=//'`
+         PROCNAME=`echo "${PROCNAME}" | sed 's/^-a=//'`
+         PROCLOG="${PATHAPP}/${PROCNAME}"
+         NAMELOG="${APPNAME}/${PROCNAME}"
          ERROR=false
          ;;
          
@@ -538,12 +328,12 @@ do
          ERROR=false
          ;;
          
-      --unique-log|-u)
+      unique|--unique-log|-u)
          UNIQUELOG=true
          ERROR=false
          ;;
          
-      -t=*|--threaddump|--threaddump=*)
+      threaddump=*|--threaddump=*|-t=*)
          THREADDUMP=true
          ERROR=false
          MAXVALUES=`echo "$1" | sed 's/^--[a-z-]*=//'`
@@ -559,12 +349,12 @@ do
          fi
          ;;
          
-      --mailto=*)
+      mailto=*|--mailto=*)
          MAILACCOUNTS=`echo "$1" | sed 's/^--[a-z-]*=//'`
          ERROR=false
          ;;
          
-      --mailreport)
+      mailreport|--mailreport)
          MAILACCOUNTS="${MAILTOADMIN} ${MAILTODEVELOPER} ${MAILTORADIO}"
          VIEWLOG=false
          ERROR=false
@@ -576,6 +366,9 @@ do
          ;;
          
       debug|--debug|-d)
+         OPTS=`echo "$@" | sed -e "s/-d//g"`
+         sh -x -v ~/bin/aptrigger "$OPTS"
+         exit 0
          DEBUG=true
          ERROR=false
          if ${START} || ${STOP} || ${STATUS}
@@ -584,7 +377,7 @@ do
          fi
          ;;
          
-      --check-config|-c)
+      check-config|--check-config|-c)
          CHECKCONFIG=true
          ERROR=false
          if ${START} || ${STOP} || ${STATUS} 
@@ -593,40 +386,44 @@ do
          fi
          ;;
          
-      --version|-v)
-         SVERSION=true
+      version|--version|-v)
+         MNVERSION=true
          show_version
          exit 0
          ;;
          
-      --help|-h)
+      help|--help|-h)
          ERROR=false
          if ${START} || ${STOP} || ${STATUS} || ${CHECKCONFIG}
          then
             ERROR=true
          else
             echo "Usage: ${NAMEAPP} [OPTION]..."
-            echo "start up or stop applications like WebLogic, Fuego, Resin, etc\n"
+            echo "start or stop applications like WebLogic, Fuego, Resin, Iplanet, etc ...\n"
             echo "Mandatory arguments in long format."
-            echo "   -[-a]pplication=[cci|puc|etc...]         set application to activate/desactivate, required"
-            echo "   -[-a]pp... --[start] [-[-u]nique-log]    start application with unique log (not err stdout)"
-            echo "   -[-a]pp... --[stop] [-[-f]orced]         stop application and backup logs"
-            echo "   -[-a]pp... [--status|-v]                 verify the status of domain"
-            echo "   -[-a]pp... -[-t]hreaddump=COUNT,INTERVAL send a 3 signal via kernel, COUNT times between INTERVAL"
-            echo "   -[-a]pp... -[-d]ebug                     debug logs and processes in the system"
-            echo "   -[-a]pp... -[-c]heck-config              check config application (see app-aptrigger.conf)"
-            echo "   [--status|-v]                            verify the status of domains"
-            echo "   -[-r]eport                               show an small report about domains"
-            echo "   ... [ --mailreport | mailto=usr@dom ]    send output to mail accounts or specified mail"
-            echo "   ... [ -[-q]uiet ]                        don't send output to terminal"
-            echo "   [--version|-V]                           give app version"
-            echo "   -[-]help                                 give this help\n"
+            echo "\t-a, --application=APPLIST         use this application, required "
+            echo "\t    --start                       start application "
+            echo "\t    --stop                        stop application "
+            echo "\t-s, --status                      verify the status of domain"
+            echo "\t-t, --threaddump=COUNT,INTERVAL   send a 3 signal via kernel, COUNT times between INTERVAL"
+            echo "\t-d, --debug                       debug logs and processes in the system"
+            echo "\t-c, --check-config                check config application (see app-${NAMEAPP}.conf)"
+            echo "\t-r, --report                      show an small report about domains"
+            echo "\t-m, --mail                        send output to mail accounts configured in ${NAMEAPP}.conf"
+            echo "\t    --mailto=user@mail.com        send output to mail accounts or specified mail"
+            echo "\t-q, --quiet                       don't send output to terminal"
+            echo "\t-v, --version                     show version"
+            echo "\t-h, --help                        show help\n"
+            echo "Each APPLIST refers to one application on the server."
+            echo "In case of threaddump options, COUNT refers to times sending kill -3 signal between "
+            echo "INTERVAL time in seconds\n"
             echo "Report bugs to <andres.aquino@gmail.com>"
          fi
          exit 0
          ;;
          
       *)
+         # verificar que no sea un keyword del menu de opciones
          ERROR=true
          ;;
    esac
@@ -637,14 +434,18 @@ done
 #
 if ${ERROR}
 then
-   echo "Usage: ${NAMEAPP} --application=[cci|puc|...] [--start|--stop|--status] [--help]"
+   echo "${APPNAME}: you must specify an application to use    "
+   echo "Try aptrigger --help for more information               "
    exit 0
 else
+   # ahora todas las salidas las almacenamos en este archivo temporal 
+   TEMPFILE=`mktemp -p aptrigger. -d ${APPNAME}`
+
    #
    # verificar que la configuración exista, antes de ejecutar el servicio 
-   if [ ${APPLICATION} != "NONSETUP" ]
+   if [ ${PROCNAME} != "NONSETUP" ]
    then
-      check_configuration "${APPLICATION}" false
+      check_configuration "${PROCNAME}" false
       [ "$?" -ne "0" ] && CHECKCONFIG=true
       [ "${TOSLEEP}" -eq "0" ] && TOSLEEP=5
       TOSLEEP="$((60*$TOSLEEP))"
@@ -656,8 +457,9 @@ else
       ${VIEWLOG} && CANCEL=false
       if ${CANCEL}
       then
-         echo "Usage: ${NAMEAPP} --application=[cci|puc|...] [--start|--stop|--status] [--help]"
-         exit 1
+         echo "${APPNAME}: you must specify an application to use    "
+         echo "Try aptrigger --help for more information               "
+         exit 0
       fi
    fi
 
@@ -675,9 +477,9 @@ else
    # CHECKCONFIG -- Verificar los parámetros del archivo de configuración
    if ${CHECKCONFIG}
    then
-      check_configuration "${APPLICATION}" true
+      check_configuration "${PROCNAME}" true
       LASTSTATUS=$?
-      FILESETUP="$HOME/${NAMEAPP}/${APPLICATION}-aptrigger.conf"
+      FILESETUP="$HOME/${NAMEAPP}/${PROCNAME}-${NAMEAPP}.conf"
       
       if [ "${LASTSTATUS}" -ne "0" ]
       then
@@ -709,15 +511,15 @@ else
          # no este trabajando, entonces verificamos usando los PID's
          if [ "${LASTSTATUS}" -eq "0" ]
          then
-            echo "${APPLICATION} have a lock process file without application, maybe a bug brain developer ?"
+            echo "${PROCNAME} have a lock process file without application, maybe a bug brain developer ?"
             rm -f "${NAMELOG}.lock"
             log_action "WARN" "Exists a lock process without an application in memory, remove it and start again automagically"
             
             #
-            # mover archivos a directorio aptrigger/20080527-0605
+            # mover archivos a directorio ${NAMEAPP}/20080527-0605
             log_backup
          else
-            echo "${APPLICATION} is running right now !"
+            echo "${PROCNAME} is running right now !"
             exit 0
          fi
       else
@@ -725,7 +527,7 @@ else
          if [ "${LASTSTATUS}" -gt "0" ]
          then
             touch "${NAMELOG}.lock"
-            echo "${APPLICATION} is running right now !"
+            echo "${PROCNAME} is running right now !"
             log_action "WARN" "The application lost the lck file, but is running actually"
             exit 0
          fi
@@ -823,7 +625,7 @@ else
       is_process_running
       if [ `wc -l "${NAMELOG}.pid" | cut -f1 -d\ ` -le 0 ]
       then
-         echo "uh, ${NAMEAPP} is not running currently, tip: aptrigger --report"
+         echo "uh, ${NAMEAPP} is not running currently, tip: ${NAMEAPP} --report"
          log_action "INFO" "The application is down"
          exit 0
       fi
@@ -892,7 +694,7 @@ else
          then
             # TODO: es necesario que sean HC(HardCode) o las dejamos en el archivo de configuracion
             log_action "INFO" "before kill the baby, we sending 3 FTD's between 8 secs"
-            ~/bin/aptrigger --application=${APPLICATION} --threaddump=3,8
+            ~/bin/${NAMEAPP} --application=${PROCNAME} --threaddump=3,8
          fi
 
          log_action "WARN" "time to using the secret weapon baby: _KILL'EM ALL_ !"
@@ -932,15 +734,15 @@ else
    # Verificar el status de la aplicación
    if ${STATUS} 
    then
-      if [ ${APPLICATION} = "NONSETUP" ]
+      if [ ${PROCNAME} = "NONSETUP" ]
       then
-         # si no se da el parametro --application, se busca en el aptrigger los .conf y se consulta su estado
+         # si no se da el parametro --application, se busca en el ${NAMEAPP} los .conf y se consulta su estado
          cd $HOME
-         for app in aptrigger/*-aptrigger.conf
+         for app in ${NAMEAPP}/*-${NAMEAPP}.conf
          do
-            app=`basename ${app%-aptrigger.*}`
-            echo "Checking $app using [ ~/bin/aptrigger --application=$app --status ] " 
-            ~/bin/aptrigger --application=$app --status 
+            app=`basename ${app%-${NAMEAPP}.*}`
+            echo "Checking $app using [ ~/bin/${NAMEAPP} --application=$app --status ] " 
+            ~/bin/${NAMEAPP} --application=$app --status 
          done
       else
          # si se da el parametro de --application, procede sobre esa aplicacion 
@@ -956,7 +758,7 @@ else
             ${VIEWLOG} && cat ${REPORT}
          else
             echo "`date`" >> ${REPORT}
-            $apmail -s "${APPLICATION} STATUS " "${MAILACCOUNTS}" < ${REPORT} > /dev/null 2>&1 &
+            $apmail -s "${PROCNAME} STATUS " "${MAILACCOUNTS}" < ${REPORT} > /dev/null 2>&1 &
             log_action "INFO" "Sending report by mail of STATUS to ${MAILACCOUNTS}"
          fi
          log_action "INFO" "Show the application status information"
@@ -983,7 +785,7 @@ else
       appipmc=`echo $SSH_CONNECTION | cut -f3 -d" "`
       appuser=`id -u -n`
       # checando el estado de las aplicaciones
-      ~/bin/aptrigger --status > /dev/null 2>&1
+      ~/bin/${NAMEAPP} --status > /dev/null 2>&1
       echo "\n"
       echo "${apphost}"
       echo "${appipmc}"
@@ -997,18 +799,18 @@ else
                         substr($5"                                         ",1,32)
                }'
       echo "--------------+---------------+-------+-------+---------------------------"
-      for app in aptrigger/*-aptrigger.conf
+      for app in ${NAMEAPP}/*-${NAMEAPP}.conf
       do
-         appname=`basename ${app%-aptrigger.*}`
+         appname=`basename ${app%-${NAMEAPP}.*}`
          apppath=`awk 'BEGIN{FS="="} /^PATHAPP/{print $2}' ${app}`
          
          # verificar que exista el PID del usuario
-         touch "${apppath}/aptrigger/${appname}.pid"
-         touch "${apppath}/aptrigger/${appname}.date"
+         touch "${apppath}/${NAMEAPP}/${appname}.pid"
+         touch "${apppath}/${NAMEAPP}/${appname}.date"
          # si el PID file existe y es mayor a 0, entonces es un proceso valido
-         pidsize=`du -s "${apppath}/aptrigger/${appname}.pid" | cut -f1`
-         appdate=`cat "${apppath}/aptrigger/${appname}.date"`
-         apppidn=`cat "${apppath}/aptrigger/${appname}.pid"`
+         pidsize=`du -s "${apppath}/${NAMEAPP}/${appname}.pid" | cut -f1`
+         appdate=`cat "${apppath}/${NAMEAPP}/${appname}.date"`
+         apppidn=`cat "${apppath}/${NAMEAPP}/${appname}.pid"`
          [ ${pidsize} -ne "0" ] && appstat="UP" || appstat="DOWN"
          
          # calcular cuanto espacio ocupa el dominio en el filesystem
@@ -1050,7 +852,7 @@ else
       appipmc=`echo $SSH_CONNECTION | cut -f3 -d" "`
       appuser=`id -u -n`
       # checando el estado de las aplicaciones
-      ~/bin/aptrigger --status > /dev/null 2>&1
+      ~/bin/${NAMEAPP} --status > /dev/null 2>&1
       echo "\n"
       echo "${apphost}"
       echo "${appipmc}"
@@ -1062,7 +864,7 @@ else
                         substr($3"                     ",1,7);
                }'
       echo "------------------+-------------------------------------------------"
-      tail -n600 "aptrigger/${NAMEAPP}.log" |  tr -d ":[]()-" | \
+      tail -n600 "${NAMEAPP}/${NAMEAPP}.log" |  tr -d ":[]()-" | \
              awk 'BEGIN{LAST="";OFS="| "}
                /SUCCESS/{
                   if($0~"STARTUP")
@@ -1078,13 +880,13 @@ else
                            substr($2"                ",1,7),
                            substr($3"                  ",1,14);
                   }
-               }' > .aptrigger.history
+               }' > .${NAMEAPP}.history
 
-      if [ "${APPLICATION}" = "NONSETUP" ]
+      if [ "${PROCNAME}" = "NONSETUP" ]
       then
-         cat .aptrigger.history | uniq | sort -r  | head -n22
+         cat .${NAMEAPP}.history | uniq | sort -r  | head -n22
       else
-         cat .aptrigger.history | uniq | sort -r  | head -n22 | grep "${APPLICATION} "
+         cat .${NAMEAPP}.history | uniq | sort -r  | head -n22 | grep "${PROCNAME} "
       fi
       echo ""
    fi
@@ -1099,12 +901,12 @@ else
    then 
       cd $HOME
       # mantenimiento de logs principal
-      for app in aptrigger/*-aptrigger.conf
+      for app in ${NAMEAPP}/*-${NAMEAPP}.conf
       do
          cd $HOME
          . ${app}
-         app=`basename ${app%-aptrigger.*}`
-         APPLICATION=$app
+         app=`basename ${app%-${NAMEAPP}.*}`
+         PROCNAME=$app
          cd $PATHAPP
          log_action "WARN" "Executing maintenance of application logs..."
          find . -name "*-*.tar.gz" -mtime +4 -type f -print | while read flog
@@ -1120,7 +922,7 @@ else
          done
       done
       # mantenimiento de logs de aplicaciones en base a shell-plugins
-      #for mplugin in aptrigger/*-maintenance.plug
+      #for mplugin in ${NAMEAPP}/*-maintenance.plug
       #do
       #   sh ${mplugin}
       #done
@@ -1141,7 +943,7 @@ else
       touch "${NAMELOG}.pid"
       touch "${NAMELOG}.date"
  
-      FLDEBUG="${NAMEAPP}/${APPLICATION}.debug"
+      FLDEBUG="${NAMEAPP}/${PROCNAME}.debug"
       echo "\n\n">> ${FLDEBUG}
       echo "DEBUG" >> ${FLDEBUG}
       echo "-------------------------------------------------------------------------------" >> ${FLDEBUG}
@@ -1154,7 +956,7 @@ else
       echo "  " >> ${FLDEBUG}
       echo "CONFIGURATION" >> ${FLDEBUG}
       echo "-------------------------------------------------------------------------------" >> ${FLDEBUG}      
-      ~/bin/aptrigger --application=${APPLICATION} --check-config >> ${FLDEBUG}
+      ~/bin/${NAMEAPP} --application=${PROCNAME} --check-config >> ${FLDEBUG}
       echo "  " >> ${FLDEBUG}
       echo "list of dir ${PATHAPP}/${NAMEAPP}" >> ${FLDEBUG}
       ls -l ${NAMEAPP} >> ${FLDEBUG} 2>&1
@@ -1170,7 +972,7 @@ else
       PROCESSES=$?
       if [ "${PROCESSES}" -ne "0" ]
       then
-         echo "${APPLICATION} is running with ${PROCESSES} processes" >> ${FLDEBUG} 2>&1
+         echo "${PROCNAME} is running with ${PROCESSES} processes" >> ${FLDEBUG} 2>&1
          if [ "`uname -s`" = "HP-UX" ]
          then
             awk '{print "ps -fex | grep "$0}' "${NAMELOG}.pid" | sh | grep "$FILTERLANG" | grep "$FILTERAPP" >> ${FLDEBUG} 2>&1
@@ -1178,7 +980,7 @@ else
             awk '{print "ps -fea | grep "$0}' "${NAMELOG}.pid" | sh | grep "$FILTERLANG" | grep "$FILTERAPP" >> ${FLDEBUG} 2>&1
          fi
       else
-         echo "${APPLICATION} is not running." >> ${FLDEBUG} 2>&1
+         echo "${PROCNAME} is not running." >> ${FLDEBUG} 2>&1
       fi
       echo "  " >> ${FLDEBUG}
       echo "FileSystem" >> ${FLDEBUG}
@@ -1196,7 +998,7 @@ else
       then
          cat ${FLDEBUG}
       else
-         $apmail -s "${APPLICATION} DEBUG INFO " "${MAILACCOUNTS}" < ${FLDEBUG} > /dev/null 2>&1 &
+         $apmail -s "${PROCNAME} DEBUG INFO " "${MAILACCOUNTS}" < ${FLDEBUG} > /dev/null 2>&1 &
          log_action "INFO" "Send information from debug application to ${MAILACCOUNTS}"
       fi
       log_action "INFO" "Show the application debug information"
@@ -1207,4 +1009,4 @@ else
    exit ${LASTSTATUS}
 fi
 
-# vim: set ts=3 sw=3 sts=3 et si ai: 
+#--
