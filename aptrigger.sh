@@ -245,7 +245,7 @@ check_weblogicserver() {
 #
 # realizar un kernel full thread dump sobre el proceso indicado.
 # sobre procesos non-java va a valer queso, por que la señal 3 es para hacer un vaciado de memoria.
-# aptrigger --application=resin --threaddump=5 --mailto=aqzero@gmail.com
+# aptrigger --application=resin --threaddump=5 --mailto=andres.aquino@gmail.com
 # por defecto, el ftd se almacena en el filesystem log de la aplicación; si se detecta que se esta
 # incrementando el uso del filesystem, conserva los mas recientes 
 make_fullthreaddump() {
@@ -368,7 +368,7 @@ show_version () {
    if ${SVERSION}
    then
       echo "${LASTSONG}"
-      echo "Written by aQzero <aqzero@gmail.com>\n"
+      echo "Written by Andrés Aquino Morales <andres.aquino@gmail.com>\n"
    fi
 
 }
@@ -621,7 +621,7 @@ do
             echo "   ... [ -[-q]uiet ]                        don't send output to terminal"
             echo "   [--version|-V]                           give app version"
             echo "   -[-]help                                 give this help\n"
-            echo "Report bugs to <aqzero@gmail.com>"
+            echo "Report bugs to <andres.aquino@gmail.com>"
          fi
          exit 0
          ;;
