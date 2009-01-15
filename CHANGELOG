@@ -1,0 +1,13 @@
+     1	ecac0373c44698ca00ab9a1e5118984308dae103 first commit
+     2	553dcf1e0e751e42bc9276dd535dbe7ad4c0f43c changes permissions, add app & config
+     3	1ad21208db259e6ac6bdd9cd8724cb466d9d5301 * correcion del vim header
+     4	3dd25c81b5e947c53d66e02ad1ea089a2c126744 update docs
+     5	11a3a48dfd914bee925c09bf794fc492126b19ce Quitar referencias laborales, cuentas de correo, puro filterjob
+     6	33e069918639ada0f567c96be7f9f01d6f784391 quitar referencias del SVN keyword
+     7	967aa500a3abc618ad1a011d6cd983f88285a777 cambio nombre y cuenta correo-e
+     8	d5b0334fb95b83935bab1769de975cac6c92125c cambios en nombre y correo ..
+     9	61ff2c2df2c1aa3f69b6116d11d0afd795e97d8d library with some util functions
+    10	ba3d1ccfa3c4114b1e097f50988c348207510263 (refs/remotes/origin/master, refs/remotes/origin/HEAD, refs/heads/master) record the application version
+    11	1377456a22ae4632f6f74340031f44c4fe2b4bd5 cambios a configuracion y shell para usar utils.lib.sh
+    12	f2e7b553aca184f91e9e40a8cf4fda9fe174d238 agregar documentacion
+    13	1dd077dacd01c829e767c6f144541f7b8d8838ae (refs/remotes/origin/v3.0Unstable, refs/heads/v3.0Unstable) agregar manual de ayuda
